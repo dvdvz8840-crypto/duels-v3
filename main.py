@@ -8,6 +8,9 @@ TOKEN = "8533497017:AAEr8AsVdxxR0hf6tYftdB2fzvDtgfoLY0U"
 ADMIN_ID = 6151671553
 bot = telebot.TeleBot(TOKEN)
 
+# --- Фото для команды /dbal ---
+IMG_BALANCE = "https://i.ibb.co/b5ndP1nq"
+
 # ---------------- Игроки и дуэли ----------------
 players = {}  # {user_id: {"username": str, "balance": int, "rating": int, "rank": str}}
 active_duels = {}  # {chat_id: {"player1": id, "player2": id, "bet": int, "turn": id, "shield": {id: bool}, "msg_id": id}}
@@ -183,21 +186,26 @@ def duel_command(message):
 # ---------------- Остальной функционал ----------------
 @bot.message_handler(commands=['dbal'])
 def check_balance(message):
-    # Убедиться, что игрок есть в players
-    user = ensure_player(message.from_user)
-    
-    username = user["username"]
-    balance = user["balance"]
-    rating = user["rating"]
-    rank = user["rank"]
-    
-    # Ссылка на изображение "Ваша статистика"
-    balance_image_url = "https://i.ibb.co/b5ndP1nq"
-    
-    # Отправляем фото с текстом под ним
+    user_id = message.from_user.id
+    # Проверяем, есть ли игрок в players, если нет — создаём
+    if user_id not in players:
+        players[user_id] = {
+            "username": message.from_user.username or message.from_user.first_name,
+            "balance": 1000,
+            "rating": 0,
+            "rank": "Новичок"
+        }
+
+    user_data = players[user_id]
+    username = user_data["username"]
+    balance = user_data["balance"]
+    rating = user_data["rating"]
+    rank = user_data["rank"]
+
+    # Отправляем картинку и статистику
     bot.send_photo(
         message.chat.id,
-        balance_image_url,
+        IMG_BALANCE,
         caption=(
             f"⚔️ <a href='https://t.me/{username}'>{username}</a> — Ваша статистика!\n\n"
             f"💰 Баланс: {balance}\n"
@@ -206,7 +214,6 @@ def check_balance(message):
         ),
         parse_mode="HTML"
     )
-
 @bot.message_handler(commands=['dg'])
 def transfer_coins(message):
     user = ensure_player(message.from_user)
