@@ -181,13 +181,29 @@ def duel_command(message):
         bot.reply_to(message, "Использование: /dd сумма_ставки")
 
 # ---------------- Остальной функционал ----------------
+# --- Команда /dbal ---
 @bot.message_handler(commands=['dbal'])
 def check_balance(message):
-    user = ensure_player(message.from_user)
-    bot.send_message(
+    user_id = message.from_user.id
+    balances.setdefault(user_id, 1000)
+    ratings.setdefault(user_id, 0)
+    ranks.setdefault(user_id, "Новичок")
+    
+    username = message.from_user.username or message.from_user.first_name
+    
+    # Ссылка на изображение "Ваша статистика"
+    balance_image_url = "https://i.ibb.co/b5ndP1nq"
+    
+    # Отправляем фото с текстом под ним
+    bot.send_photo(
         message.chat.id,
-        f"💰 <a href='https://t.me/{user['username']}'>{user['username']}</a> ваши монеты: {user['balance']}\n"
-        f"⚔️ Рейтинг: {user['rating']} | Ранг: {user['rank']}",
+        balance_image_url,
+        caption=(
+            f"⚔️ <a href='https://t.me/{username}'>{username}</a> Вы получили статистику!\n\n"
+            f"💰 Баланс: {balances[user_id]}\n"
+            f"🎖 Ранг: {ranks[user_id]}\n"
+            f"⚔️ Рейтинг: {ratings[user_id]}"
+        ),
         parse_mode="HTML"
     )
 
