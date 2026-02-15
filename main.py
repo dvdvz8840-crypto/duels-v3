@@ -270,7 +270,7 @@ def end_duel(chat_id, winner_id, loser_id, bet):
                 f"🔫 <a href='https://t.me/{winner['username']}'>{winner['username']}</a> убил "
                 f"<a href='https://t.me/{loser['username']}'>{loser['username']}</a>\n\n"
                 f"👑 Победитель: <a href='https://t.me/{winner['username']}'>{winner['username']}</a>\n"
-                f"💰 Выигрыш: {bet*2}\n"
+                f"💰 Выигрыш: {bet*2} монет\n"
                 f"🎖️ Рейтинг: +30",
         parse_mode="HTML"
     )
