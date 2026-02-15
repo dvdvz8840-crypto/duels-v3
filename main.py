@@ -100,12 +100,14 @@ def duel_request(message):
             InlineKeyboardButton("✖️ Отмена", callback_data="cancel_duel")
         )
         msg = bot.send_photo(
-            message.chat.id,
-            IMG_WAIT_DUEL,
-            caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n💬 Чтобы принять, нажмите кнопку снизу",
-            parse_mode="HTML",
-            reply_markup=markup
-        )
+    message.chat.id,
+    IMG_WAIT_DUEL,
+    caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n"
+            f"💰 Ставка: {bet} монет\n\n"
+            f"💬 Чтобы принять, нажмите кнопку снизу",
+    parse_mode="HTML",
+    reply_markup=markup
+)
         pending_duels[message.chat.id] = {"initiator": message.from_user.id, "bet": bet, "msg_id": msg.message_id}
     except:
         bot.reply_to(message, "💬 Чтобы кинуть вызов в чат, введите /dd (сумма)")
