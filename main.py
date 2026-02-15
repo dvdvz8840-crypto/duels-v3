@@ -160,7 +160,7 @@ def duel_callbacks(call):
         next_turn(chat_id)
     elif call.data == "shoot":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
-        chance = 35 if duel["shield"].get(opponent_id, False) else 50
+        chance = 20 if duel["shield"].get(opponent_id, False) else 35
         hit = random.randint(1,100) <= chance
         if hit:
             end_duel(chat_id, user_id, opponent_id, duel["bet"])
