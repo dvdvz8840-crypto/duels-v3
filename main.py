@@ -110,6 +110,7 @@ def duel_request(message):
     except:
         bot.reply_to(message, "💬 Чтобы кинуть вызов в чат, введите /dd (сумма)")
 
+# ---------------- Callbacks ----------------
 @bot.callback_query_handler(func=lambda call: call.data in ["accept_duel","cancel_duel","shoot","shield","cancel"])
 def duel_callbacks(call):
     chat_id = call.message.chat.id
@@ -129,7 +130,6 @@ def duel_callbacks(call):
         bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
         start_duel(chat_id, initiator_id, user_id, bet)
         del pending_duels[chat_id]
-        bot.answer_callback_query(call.id, "⚔️ Дуэль началась!")
         return
     elif call.data == "cancel_duel":
         if chat_id not in pending_duels:
@@ -152,10 +152,12 @@ def duel_callbacks(call):
         bot.answer_callback_query(call.id, "❌ Сейчас не ваш ход")
         return
 
+    # --- Защита ---
     if call.data == "shield":
         duel["shield"][user_id] = True
         bot.answer_callback_query(call.id, "🛡️ Вы активировали защиту")
         next_turn(chat_id)
+    # --- Выстрел ---
     elif call.data == "shoot":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
         chance = 35 if duel["shield"].get(opponent_id, False) else 50
@@ -166,6 +168,7 @@ def duel_callbacks(call):
             msg = bot.send_message(chat_id, f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!", parse_mode="HTML")
             duel.setdefault("messages", []).append(msg.message_id)
             next_turn(chat_id)
+    # --- Отмена во время дуэли ---
     elif call.data == "cancel":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
         canceller = players[user_id]
@@ -175,6 +178,7 @@ def duel_callbacks(call):
         opponent["balance"] += duel["bet"]
         update_rank_in_chat(chat_id, user_id)
         update_rank_in_chat(chat_id, opponent_id)
+        # удаляем все сообщения дуэли
         bot.delete_message(chat_id, duel["msg_id"])
         for mid in duel.get("messages", []):
             bot.delete_message(chat_id, mid)
@@ -188,6 +192,7 @@ def duel_callbacks(call):
             parse_mode="HTML"
         )
         del active_duels[chat_id]
+
 
 # ---------------- Баланс ----------------
 @bot.message_handler(commands=['dbal'])
