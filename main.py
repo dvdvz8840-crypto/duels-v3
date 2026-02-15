@@ -292,7 +292,7 @@ def transfer_coins(message):
 def leaderboard(message):
     top = sorted(players.values(), key=lambda x:x["rating"], reverse=True)[:10]
     text = "⚔️ Список лидеров:\n\n"
-    for i,p in enumerate(top,start=1):
+                                                                                                                                                                                                                            for i,p in enumerate(top,start=1):
         text += f"🔹 {i}. <a href='https://t.me/{p['username']}'>{p['username']}</a> - {p['rank']} | {p['rating']}\n"
     bot.send_photo(message.chat.id, IMG_LEADERBOARD, caption=text, parse_mode="HTML")
 
