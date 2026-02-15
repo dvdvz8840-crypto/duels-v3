@@ -107,7 +107,7 @@ def duel_request(message):
         )
         pending_duels[message.chat.id] = {"initiator": message.from_user.id, "bet": bet, "msg_id": msg.message_id}
     except:
-        bot.reply_to(message, "Использование: /dd <сумма>")
+        bot.reply_to(message, "💬 Чтобы кинуть вызов в чат, введите /dd (сумма)")
 
 # ---------------- Callbacks ----------------
 @bot.callback_query_handler(func=lambda call: call.data in ["accept_duel","cancel_duel","shoot","shield","cancel"])
@@ -263,7 +263,7 @@ def admin_give(message):
             parse_mode="HTML"
         )
     except:
-        bot.reply_to(message, "Использование: двыдать @username сумма")
+        bot.reply_to(message, "💎 Чтобы выдать монеты: /двыдать @username сумма")
 
 @bot.message_handler(commands=['дперевод'])
 def transfer_coins(message):
@@ -289,11 +289,11 @@ def transfer_coins(message):
             message.chat.id,
             f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> перевел "
             f"<a href='https://t.me/{target['username']}'>{target['username']}</a> {amount} монет.\n"
-            f"💰 Баланс {target['username']}: {target['balance']}",
+            f"💰 Баланс <a href='https://t.me/{user['username']}'>{user['username']}</a>: {target['balance']}",
             parse_mode="HTML"
         )
     except:
-        bot.reply_to(message, "Использование: дперевод @username сумма")
+        bot.reply_to(message, "🔹 Чтобы перевести монеты: /дперевод @username сумма")
 
 @bot.message_handler(commands=['drang'])
 def leaderboard(message):
