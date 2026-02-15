@@ -138,8 +138,9 @@ def duel_callbacks(call):
     chat_id = call.message.chat.id
     user_id = call.from_user.id
 
-    # --- Ожидающие дуэли ---
-        if call.data == "accept_duel":
+    # ---------------- ОЖИДАЮЩИЕ ДУЭЛИ ----------------
+
+    if call.data == "accept_duel":
         if chat_id not in pending_duels:
             bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
             return
@@ -173,63 +174,101 @@ def duel_callbacks(call):
 
         bot.answer_callback_query(call.id, "⚔️ Дуэль началась!")
         return
-    elif call.data == "cancel_duel":
+
+
+    if call.data == "cancel_duel":
         if chat_id not in pending_duels:
             bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
             return
+
         if user_id != pending_duels[chat_id]["initiator"]:
             bot.answer_callback_query(call.id, "❌ Только инициатор может отменить")
             return
+
+        # Возвращаем ставку инициатору
+        bet = pending_duels[chat_id]["bet"]
+        initiator_id = pending_duels[chat_id]["initiator"]
+        players[initiator_id]["balance"] += bet
+
         bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
         del pending_duels[chat_id]
+
         bot.answer_callback_query(call.id, "✅ Вы отменили дуэль")
         return
 
-    # --- Активные дуэли ---
+
+    # ---------------- АКТИВНЫЕ ДУЭЛИ ----------------
+
     if chat_id not in active_duels:
         bot.answer_callback_query(call.id, "❌ Нет активной дуэли")
         return
+
     duel = active_duels[chat_id]
+
     if user_id != duel["turn"]:
         bot.answer_callback_query(call.id, "❌ Сейчас не ваш ход")
         return
+
 
     if call.data == "shield":
         duel["shield"][user_id] = True
         bot.answer_callback_query(call.id, "🛡️ Вы активировали защиту")
         next_turn(chat_id)
-    elif call.data == "shoot":
+        return
+
+
+    if call.data == "shoot":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
+
         chance = 10 if duel["shield"].get(opponent_id, False) else 25
-        hit = random.randint(1,100) <= chance
+        hit = random.randint(1, 100) <= chance
+
         if hit:
             end_duel(chat_id, user_id, opponent_id, duel["bet"])
         else:
-            msg = bot.send_message(chat_id, f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!", parse_mode="HTML")
+            msg = bot.send_message(
+                chat_id,
+                f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!",
+                parse_mode="HTML"
+            )
             duel.setdefault("messages", []).append(msg.message_id)
             next_turn(chat_id)
-    elif call.data == "cancel":
+        return
+
+
+    if call.data == "cancel":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
+
         canceller = players[user_id]
         opponent = players[opponent_id]
+
+        # Штраф отменяющему
         canceller["rating"] -= 15
-        canceller["balance"] += int(duel["bet"]*0.35)
+        canceller["balance"] += int(duel["bet"] * 0.35)
+
+        # Второму возвращаем ставку
         opponent["balance"] += duel["bet"]
+
         update_rank_in_chat(chat_id, user_id)
         update_rank_in_chat(chat_id, opponent_id)
+
         bot.delete_message(chat_id, duel["msg_id"])
+
         for mid in duel.get("messages", []):
             bot.delete_message(chat_id, mid)
+
         bot.send_photo(
             chat_id,
             IMG_DUEL_CANCEL,
-            caption=f"⚔️ <a href='https://t.me/{canceller['username']}'>{canceller['username']}</a> отменил дуэль!\n"
-                    f"💰 {int(duel['bet']*0.35)} возвращено\n"
-                    f"⚔️ Рейтинг -15\n"
-                    f"💰 Баланс <a href='https://t.me/{opponent['username']}'>{opponent['username']}</a> возвращено {duel['bet']}",
+            caption=f"⚔️ <a href='https://t.me/{canceller['username']}'>{canceller['username']}</a> отменил дуэль!\n\n"
+                    f"💰 Возвращено: {int(duel['bet'] * 0.35)} монет\n"
+                    f"⚔️ Рейтинг: -15\n\n"
+                    f"💰 <a href='https://t.me/{opponent['username']}'>{opponent['username']}</a> возвращено {duel['bet']} монет",
             parse_mode="HTML"
         )
+
         del active_duels[chat_id]
+        return
 
 # ---------------- Начало дуэли ----------------
 def start_duel(chat_id, player1_id, player2_id, bet):
