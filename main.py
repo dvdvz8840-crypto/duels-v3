@@ -14,6 +14,7 @@ IMG_BALANCE = "https://i.ibb.co/b5ndP1nq"
 players = {}  # {user_id: {"username": str, "balance": int, "rating": int, "rank": str}}
 active_duels = {}  # {chat_id: {"player1": id, "player2": id, "bet": int, "turn": id, "shield": {id: bool}, "msg_id": id}}
 bonus_cooldown = {}  # {user_id: timestamp}
+pending_duels = {}  # {chat_id: {"initiator": id, "bet": int, "msg_id": int}}
 
 # Ранги с порогами рейтинга
 RANKS = [
@@ -67,16 +68,104 @@ def update_rank(user_id):
                 parse_mode="HTML"
             )
 
-# ---------------- Дуэль ----------------
+# ---------------- Дуэли ----------------
+@bot.message_handler(commands=['dd'])
+def duel_request(message):
+    try:
+        parts = message.text.split()
+        bet = int(parts[1])
+        user = ensure_player(message.from_user)
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("⚔️ Сразиться", callback_data="accept_duel"),
+            InlineKeyboardButton("✖️ Отмена", callback_data="cancel_duel")
+        )
+        msg = bot.send_message(
+            message.chat.id,
+            f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n"
+            f"💬 Чтобы принять, нажмите кнопку снизу",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+        pending_duels[message.chat.id] = {"initiator": message.from_user.id, "bet": bet, "msg_id": msg.message_id}
+    except:
+        bot.reply_to(message, "Использование: /dd <сумма>")
+
+@bot.callback_query_handler(func=lambda call: call.data in ["accept_duel","cancel_duel","shoot","shield","cancel"])
+def duel_callbacks(call):
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+    # ---------------- Ожидающие дуэли ----------------
+    if call.data == "accept_duel":
+        if chat_id not in pending_duels:
+            bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
+            return
+        initiator_id = pending_duels[chat_id]["initiator"]
+        bet = pending_duels[chat_id]["bet"]
+        if user_id == initiator_id:
+            bot.answer_callback_query(call.id, "❌ Вы не можете принять свой вызов")
+            return
+        opponent = ensure_player(call.from_user)
+        # Убираем сообщение с кнопками
+        bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
+        start_duel(chat_id, initiator_id, user_id, bet)
+        del pending_duels[chat_id]
+        return
+    elif call.data == "cancel_duel":
+        if chat_id not in pending_duels:
+            bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
+            return
+        if user_id != pending_duels[chat_id]["initiator"]:
+            bot.answer_callback_query(call.id, "❌ Только инициатор может отменить")
+            return
+        bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
+        del pending_duels[chat_id]
+        bot.answer_callback_query(call.id, "✅ Вы отменили дуэль")
+        return
+    # ---------------- Активные дуэли ----------------
+    if chat_id not in active_duels:
+        bot.answer_callback_query(call.id, "❌ Нет активной дуэли")
+        return
+    duel = active_duels[chat_id]
+    if user_id != duel["turn"]:
+        bot.answer_callback_query(call.id, "❌ Сейчас не ваш ход")
+        return
+    if call.data == "shield":
+        duel["shield"][user_id] = True
+        bot.answer_callback_query(call.id, "🛡️ Вы активировали защиту")
+        next_turn(chat_id)
+    elif call.data == "shoot":
+        opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
+        chance = 35 if duel["shield"].get(opponent_id, False) else 50
+        hit = random.randint(1,100) <= chance
+        if hit:
+            end_duel(chat_id, user_id, opponent_id, duel["bet"])
+        else:
+            bot.send_message(chat_id, f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!", parse_mode="HTML")
+            next_turn(chat_id)
+    elif call.data == "cancel":
+        opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
+        # Отмена дуэли с штрафом
+        winner = players[opponent_id]
+        loser = players[user_id]
+        loser["rating"] -= 35
+        loser["balance"] += int(duel["bet"]*0.85)
+        update_rank(user_id)
+        bot.send_message(chat_id,
+                         f"⚔️ Дуэль отменена!\n"
+                         f"<a href='https://t.me/{loser['username']}'>{loser['username']}</a> отменил дуэль. 85% ставки возвращено.\n"
+                         f"⚔️ Рейтинг {loser['username']}: {loser['rating']}",
+                         parse_mode="HTML")
+        del active_duels[chat_id]
+
 def start_duel(chat_id, player1_id, player2_id, bet):
     p1 = players[player1_id]
-    if player2_id:
-        p2 = players[player2_id]
-        if p1["balance"] < bet or p2["balance"] < bet:
-            bot.send_message(chat_id, "❌ У одного из игроков недостаточно монет для ставки")
-            return
-        p1["balance"] -= bet
-        p2["balance"] -= bet
+    p2 = players[player2_id]
+    if p1["balance"] < bet or p2["balance"] < bet:
+        bot.send_message(chat_id, "❌ Недостаточно монет для ставки")
+        return
+    p1["balance"] -= bet
+    p2["balance"] -= bet
     duel = {"player1": player1_id, "player2": player2_id, "bet": bet, "turn": player1_id, "shield": {player1_id: False, player2_id: False}}
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -85,41 +174,14 @@ def start_duel(chat_id, player1_id, player2_id, bet):
         InlineKeyboardButton("✖️ Отмена", callback_data="cancel")
     )
     msg = bot.send_message(chat_id,
-                           f"⚔️ Дуэль началась!\n"
-                           f"Ход <a href='https://t.me/{players[player1_id]['username']}'>{players[player1_id]['username']}</a>\n"
-                           f"💰 Ставка: {bet}",
+                           f"⚔️ <a href='https://t.me/{p1['username']}'>{p1['username']}</a> начал дуэль с "
+                           f"<a href='https://t.me/{p2['username']}'>{p2['username']}</a>\n"
+                           f"💰 Ставка: {bet}\n"
+                           f"⏪ Первый ход предоставляется <a href='https://t.me/{p1['username']}'>{p1['username']}</a>",
                            parse_mode="HTML",
                            reply_markup=markup)
     duel["msg_id"] = msg.message_id
     active_duels[chat_id] = duel
-
-def end_duel(chat_id, winner_id, loser_id, bet, cancelled=False):
-    winner = players[winner_id]
-    loser = players[loser_id]
-    if cancelled:
-        winner["balance"] += int(bet*0.85)
-        loser["rating"] -= 35
-        update_rank(loser_id)
-        bot.send_message(chat_id,
-                         f"⚔️ Дуэль отменена!\n"
-                         f"<a href='https://t.me/{winner['username']}'>{winner['username']}</a> получил 85% ставки обратно\n"
-                         f"⚔️ Рейтинг {loser['username']}: {loser['rating']}",
-                         parse_mode="HTML")
-    else:
-        winner["balance"] += bet*2
-        winner["rating"] += 100
-        loser["rating"] -= 15
-        update_rank(winner_id)
-        update_rank(loser_id)
-        bot.send_message(chat_id,
-                         f"⚔️ Дуэль завершилась!\n"
-                         f"🏆 Победитель: <a href='https://t.me/{winner['username']}'>{winner['username']}</a>\n"
-                         f"💀 Проигравший: <a href='https://t.me/{loser['username']}'>{loser['username']}</a>\n"
-                         f"💰 Выигрыш: {bet*2}\n"
-                         f"⚔️ Рейтинг: {winner['rating']} | {loser['rating']}",
-                         parse_mode="HTML")
-    if chat_id in active_duels:
-        del active_duels[chat_id]
 
 def next_turn(chat_id):
     duel = active_duels[chat_id]
@@ -141,46 +203,25 @@ def next_turn(chat_id):
         reply_markup=markup
     )
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_duel(call):
-    chat_id = call.message.chat.id
-    user_id = call.from_user.id
-    if chat_id not in active_duels:
-        bot.answer_callback_query(call.id, "❌ Нет активной дуэли")
-        return
-    duel = active_duels[chat_id]
-    if user_id != duel["turn"]:
-        bot.answer_callback_query(call.id, "❌ Сейчас не ваш ход")
-        return
-    if call.data == "shield":
-        duel["shield"][user_id] = True
-        bot.answer_callback_query(call.id, "🛡️ Вы активировали защиту")
-        next_turn(chat_id)
-    elif call.data == "shoot":
-        opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
-        chance = 35 if duel["shield"].get(opponent_id, False) else 50
-        hit = random.randint(1, 100) <= chance
-        if hit:
-            end_duel(chat_id, user_id, opponent_id, duel["bet"])
-        else:
-            bot.send_message(chat_id, f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!", parse_mode="HTML")
-            next_turn(chat_id)
-    elif call.data == "cancel":
-        opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
-        end_duel(chat_id, user_id, opponent_id, duel["bet"], cancelled=True)
+def end_duel(chat_id, winner_id, loser_id, bet):
+    winner = players[winner_id]
+    loser = players[loser_id]
+    winner["balance"] += bet*2
+    winner["rating"] += 100
+    loser["rating"] -= 15
+    update_rank(winner_id)
+    update_rank(loser_id)
+    bot.send_message(chat_id,
+                     f"⚔️ Дуэль завершилась.\n\n"
+                     f"🔫 <a href='https://t.me/{winner['username']}'>{winner['username']}</a> убил "
+                     f"<a href='https://t.me/{loser['username']}'>{loser['username']}</a>\n\n"
+                     f"👑 Победитель: <a href='https://t.me/{winner['username']}'>{winner['username']}</a>\n"
+                     f"💰 Выигрыш: {bet*2}\n"
+                     f"🎖️ Рейтинг: +100",
+                     parse_mode="HTML")
+    del active_duels[chat_id]
 
-# ---------------- Команды ----------------
-@bot.message_handler(commands=['dd'])
-def duel_command(message):
-    try:
-        parts = message.text.split()
-        bet = int(parts[1])
-        user = ensure_player(message.from_user)
-        start_duel(message.chat.id, message.from_user.id, None, bet)
-    except:
-        bot.reply_to(message, "Использование: /dd сумма_ставки")
-
-# ---------------- Команда /dbal ----------------
+# ---------------- Остальные команды ----------------
 @bot.message_handler(commands=['dbal'])
 def check_balance(message):
     user_data = ensure_player(message.from_user)
@@ -206,7 +247,7 @@ def transfer_coins(message):
     user = ensure_player(message.from_user)
     try:
         parts = message.text.split()
-        target_username = parts[1].replace("@", "")
+        target_username = parts[1].replace("@","")
         amount = int(parts[2])
         if user["balance"] < amount:
             bot.reply_to(message, "❌ Недостаточно монет для перевода")
@@ -228,7 +269,7 @@ def transfer_coins(message):
             f"💰 Баланс {target['username']}: {target['balance']}",
             parse_mode="HTML"
         )
-    except Exception:
+    except:
         bot.reply_to(message, "Использование: /dg @username сумма")
 
 @bot.message_handler(commands=['двыдать'])
@@ -237,7 +278,7 @@ def admin_give(message):
         return
     try:
         parts = message.text.split()
-        target_username = parts[1].replace("@", "")
+        target_username = parts[1].replace("@","")
         amount = int(parts[2])
         target = None
         for u in players.values():
@@ -253,7 +294,7 @@ def admin_give(message):
             f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
             parse_mode="HTML"
         )
-    except Exception:
+    except:
         bot.reply_to(message, "Использование: /двыдать @username сумма")
 
 @bot.message_handler(commands=['дбонус'])
@@ -266,7 +307,7 @@ def daily_bonus(message):
         mins, secs = divmod(remaining, 60)
         bot.reply_to(message, f"🕒 Бонус снова будет доступен через {mins} минут и {secs} секунд")
         return
-    rating_gain = random.randint(5, 40)
+    rating_gain = random.randint(5,40)
     user["balance"] += BONUS_AMOUNT
     user["rating"] += rating_gain
     update_rank(user_id)
@@ -281,11 +322,11 @@ def daily_bonus(message):
 
 @bot.message_handler(commands=['drang'])
 def leaderboard(message):
-    top = sorted(players.values(), key=lambda x: x["rating"], reverse=True)[:10]
+    top = sorted(players.values(), key=lambda x:x["rating"], reverse=True)[:10]
     text = "⚔️ Список лидеров:\n\n"
-    for i, p in enumerate(top, start=1):
+    for i,p in enumerate(top,start=1):
         text += f"🔹 {i}. <a href='https://t.me/{p['username']}'>{p['username']}</a> - {p['rank']} | {p['rating']}\n"
-    bot.send_message(message.chat.id, text, parse_mode="HTML")
+    bot.send_message(message.chat.id,text,parse_mode="HTML")
 
-# ---------------- Запуск бота ----------------
+# ---------------- Запуск ----------------
 bot.infinity_polling()
