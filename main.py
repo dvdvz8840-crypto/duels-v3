@@ -184,7 +184,6 @@ def duel_callbacks(call):
                      f"💰 {opponent['username']} получил 100% своей ставки обратно"),
             parse_mode="HTML"
         )
-        del active_duels[chat_id]
 
 # ---------------- Баланс ----------------
 @bot.message_handler(commands=['dbal'])
