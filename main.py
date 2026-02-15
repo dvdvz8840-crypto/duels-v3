@@ -17,7 +17,6 @@ IMG_RANK_UP = "https://ibb.co/Kz0g8vdv"
 IMG_RANK_DOWN = "https://ibb.co/KjWkJbqR"
 IMG_DUEL_START = "https://ibb.co/PvXNfTTm"
 IMG_DUEL_END = "https://ibb.co/QvYxJmQs"
-IMG_USPEX = "https://ibb.co/cSbBpXJL"
 
 # ---------------- Игроки и дуэли ----------------
 players = {}           # {user_id: {username, balance, rating, rank}}
@@ -258,9 +257,8 @@ def admin_give(message):
             players[target_id] = {"username": target_username, "balance": 0, "rating":0, "rank": get_rank(0)}
             target = players[target_id]
         target["balance"] += amount
-         bot.send_photo(
+        bot.send_message(
             message.chat.id,
-            IMG_USPEX,
             f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
             parse_mode="HTML"
         )
