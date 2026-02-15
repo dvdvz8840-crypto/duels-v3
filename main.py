@@ -22,8 +22,8 @@ IMG_TRANSACTION = "https://ibb.co/cSbBpXJL"  # Фото для выдачи и �
 # ---------------- Игроки и дуэли ----------------
 players = {}
 active_duels = {}
-pending_duels = {}
 bonus_cooldown = {}
+pending_duels = {}
 
 # Ранги с порогами рейтинга
 RANKS = [
@@ -111,6 +111,7 @@ def duel_request(message):
     except:
         bot.reply_to(message, "Использование: /dd <сумма>")
 
+# ---------------- Callback для дуэлей ----------------
 @bot.callback_query_handler(func=lambda call: call.data in ["accept_duel","cancel_duel","shoot","shield","cancel"])
 def duel_callbacks(call):
     chat_id = call.message.chat.id
@@ -166,7 +167,7 @@ def duel_callbacks(call):
             bot.send_message(chat_id, f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!", parse_mode="HTML")
             next_turn(chat_id)
     elif call.data == "cancel":
-        # Отмена во время дуэли
+        # отмена во время дуэли
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
         canceller = players[user_id]
         opponent = players[opponent_id]
@@ -184,6 +185,7 @@ def duel_callbacks(call):
             parse_mode="HTML"
         )
         del active_duels[chat_id]
+
 # ---------------- Баланс ----------------
 @bot.message_handler(commands=['dbal'])
 def check_balance(message):
