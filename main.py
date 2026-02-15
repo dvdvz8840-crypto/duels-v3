@@ -90,25 +90,46 @@ def duel_request(message):
     try:
         parts = message.text.split()
         bet = int(parts[1])
+
+        user = ensure_player(message.from_user)
+
         if bet < 50:
             bot.reply_to(message, "❌ Минимальная ставка — 50 монет")
             return
-        user = ensure_player(message.from_user)
+
+        if user["balance"] <= 0:
+            bot.reply_to(message, "❌ У вас нет монет для дуэли.")
+            return
+
+        if bet > user["balance"]:
+            bot.reply_to(message, "❌ У вас недостаточно монет, чтобы кинуть вызов больше своего баланса.")
+            return
+
+        # Списываем ставку сразу (резервируем)
+        user["balance"] -= bet
+
         markup = InlineKeyboardMarkup()
         markup.row(
             InlineKeyboardButton("⚔️ Сразиться", callback_data="accept_duel"),
             InlineKeyboardButton("✖️ Отмена", callback_data="cancel_duel")
         )
+
         msg = bot.send_photo(
-    message.chat.id,
-    IMG_WAIT_DUEL,
-    caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n"
-            f"💰 Ставка: {bet} монет\n\n"
-            f"💬 Чтобы принять, нажмите кнопку снизу",
-    parse_mode="HTML",
-    reply_markup=markup
-)
-        pending_duels[message.chat.id] = {"initiator": message.from_user.id, "bet": bet, "msg_id": msg.message_id}
+            message.chat.id,
+            IMG_WAIT_DUEL,
+            caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n"
+                    f"💰 Ставка: {bet} монет\n\n"
+                    f"💬 Чтобы принять, нажмите кнопку снизу",
+            parse_mode="HTML",
+            reply_markup=markup
+        )
+
+        pending_duels[message.chat.id] = {
+            "initiator": message.from_user.id,
+            "bet": bet,
+            "msg_id": msg.message_id
+        }
+
     except:
         bot.reply_to(message, "💬 Чтобы кинуть вызов в чат, введите /dd (сумма)")
 
@@ -119,22 +140,39 @@ def duel_callbacks(call):
 
     # --- Ожидающие дуэли ---
     if call.data == "accept_duel":
-        if chat_id not in pending_duels:
-            bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
-            return
-        initiator_id = pending_duels[chat_id]["initiator"]
-        bet = pending_duels[chat_id]["bet"]
-        if user_id == initiator_id:
-            bot.answer_callback_query(call.id, "❌ Вы не можете принять свой вызов")
-            return
-        opponent = ensure_player(call.from_user)
-        # Удаляем сообщение с кнопками вызова
-        bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
-        del pending_duels[chat_id]
-        # Начинаем дуэль
-        start_duel(chat_id, initiator_id, user_id, bet)
-        bot.answer_callback_query(call.id, "⚔️ Дуэль началась!")
+    if chat_id not in pending_duels:
+        bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
         return
+
+    initiator_id = pending_duels[chat_id]["initiator"]
+    bet = pending_duels[chat_id]["bet"]
+
+    if user_id == initiator_id:
+        bot.answer_callback_query(call.id, "❌ Вы не можете принять свой вызов")
+        return
+
+    opponent = ensure_player(call.from_user)
+
+    if opponent["balance"] < bet:
+        bot.answer_callback_query(
+            call.id,
+            "❌ У вас недостаточно монет, чтобы принять вызов",
+            show_alert=True
+        )
+        return
+
+    # Списываем ставку у второго игрока
+    opponent["balance"] -= bet
+
+    # Удаляем сообщение вызова
+    bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
+    del pending_duels[chat_id]
+
+    # Начинаем дуэль
+    start_duel(chat_id, initiator_id, user_id, bet)
+
+    bot.answer_callback_query(call.id, "⚔️ Дуэль началась!")
+    return
     elif call.data == "cancel_duel":
         if chat_id not in pending_duels:
             bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
