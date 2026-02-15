@@ -2,11 +2,13 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import time
 import random
-import threading
 
 TOKEN = "8533497017:AAEr8AsVdxxR0hf6tYftdB2fzvDtgfoLY0U"
 ADMIN_ID = 6151671553
 bot = telebot.TeleBot(TOKEN)
+
+# --- Фото для команды /dbal ---
+IMG_BALANCE = "https://i.ibb.co/b5ndP1nq"
 
 # ---------------- Игроки и дуэли ----------------
 players = {}  # {user_id: {"username": str, "balance": int, "rating": int, "rank": str}}
@@ -42,6 +44,8 @@ def ensure_player(user):
     if user_id not in players:
         username = user.username or user.first_name
         players[user_id] = {"username": username, "balance": 1000, "rating": 0, "rank": get_rank(0)}
+    else:
+        players[user_id]["username"] = user.username or user.first_name
     return players[user_id]
 
 def update_rank(user_id):
@@ -66,14 +70,13 @@ def update_rank(user_id):
 # ---------------- Дуэль ----------------
 def start_duel(chat_id, player1_id, player2_id, bet):
     p1 = players[player1_id]
-    p2 = players[player2_id]
-    if p1["balance"] < bet or p2["balance"] < bet:
-        bot.send_message(chat_id, "❌ У одного из игроков недостаточно монет для ставки")
-        return
-    # Списание ставки
-    p1["balance"] -= bet
-    p2["balance"] -= bet
-    # Создаем дуэль
+    if player2_id:
+        p2 = players[player2_id]
+        if p1["balance"] < bet or p2["balance"] < bet:
+            bot.send_message(chat_id, "❌ У одного из игроков недостаточно монет для ставки")
+            return
+        p1["balance"] -= bet
+        p2["balance"] -= bet
     duel = {"player1": player1_id, "player2": player2_id, "bet": bet, "turn": player1_id, "shield": {player1_id: False, player2_id: False}}
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -94,7 +97,6 @@ def end_duel(chat_id, winner_id, loser_id, bet, cancelled=False):
     winner = players[winner_id]
     loser = players[loser_id]
     if cancelled:
-        # Возврат 85% ставки игроку, который отменил
         winner["balance"] += int(bet*0.85)
         loser["rating"] -= 35
         update_rank(loser_id)
@@ -122,9 +124,7 @@ def end_duel(chat_id, winner_id, loser_id, bet, cancelled=False):
 def next_turn(chat_id):
     duel = active_duels[chat_id]
     duel["turn"] = duel["player2"] if duel["turn"] == duel["player1"] else duel["player1"]
-    # Сбрасываем щит
     duel["shield"][duel["turn"]] = False
-    # Обновляем сообщение
     p = players[duel["turn"]]
     markup = InlineKeyboardMarkup()
     markup.row(
@@ -180,22 +180,15 @@ def duel_command(message):
     except:
         bot.reply_to(message, "Использование: /dd сумма_ставки")
 
-# ---------------- Остальной функционал ----------------
-
-IMG_BALANCE = "https://i.ibb.co/b5ndP1nq"
-
-# --- Команда /dbal с картинкой ---
+# ---------------- Команда /dbal ----------------
 @bot.message_handler(commands=['dbal'])
 def check_balance(message):
-    # Убедимся, что игрок есть в словаре players
     user_data = ensure_player(message.from_user)
-
     username = user_data["username"]
     balance = user_data["balance"]
     rating = user_data["rating"]
     rank = user_data["rank"]
 
-    # Отправляем фото с подписью
     bot.send_photo(
         message.chat.id,
         IMG_BALANCE,
@@ -207,7 +200,7 @@ def check_balance(message):
         ),
         parse_mode="HTML"
     )
-    
+
 @bot.message_handler(commands=['dg'])
 def transfer_coins(message):
     user = ensure_player(message.from_user)
