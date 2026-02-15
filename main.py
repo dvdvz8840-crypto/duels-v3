@@ -139,40 +139,40 @@ def duel_callbacks(call):
     user_id = call.from_user.id
 
     # --- Ожидающие дуэли ---
-    if call.data == "accept_duel":
-    if chat_id not in pending_duels:
-        bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
+        if call.data == "accept_duel":
+        if chat_id not in pending_duels:
+            bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
+            return
+
+        initiator_id = pending_duels[chat_id]["initiator"]
+        bet = pending_duels[chat_id]["bet"]
+
+        if user_id == initiator_id:
+            bot.answer_callback_query(call.id, "❌ Вы не можете принять свой вызов")
+            return
+
+        opponent = ensure_player(call.from_user)
+
+        if opponent["balance"] < bet:
+            bot.answer_callback_query(
+                call.id,
+                "❌ У вас недостаточно монет, чтобы принять вызов",
+                show_alert=True
+            )
+            return
+
+        # Списываем ставку у второго игрока
+        opponent["balance"] -= bet
+
+        # Удаляем сообщение вызова
+        bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
+        del pending_duels[chat_id]
+
+        # Начинаем дуэль
+        start_duel(chat_id, initiator_id, user_id, bet)
+
+        bot.answer_callback_query(call.id, "⚔️ Дуэль началась!")
         return
-
-    initiator_id = pending_duels[chat_id]["initiator"]
-    bet = pending_duels[chat_id]["bet"]
-
-    if user_id == initiator_id:
-        bot.answer_callback_query(call.id, "❌ Вы не можете принять свой вызов")
-        return
-
-    opponent = ensure_player(call.from_user)
-
-    if opponent["balance"] < bet:
-        bot.answer_callback_query(
-            call.id,
-            "❌ У вас недостаточно монет, чтобы принять вызов",
-            show_alert=True
-        )
-        return
-
-    # Списываем ставку у второго игрока
-    opponent["balance"] -= bet
-
-    # Удаляем сообщение вызова
-    bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
-    del pending_duels[chat_id]
-
-    # Начинаем дуэль
-    start_duel(chat_id, initiator_id, user_id, bet)
-
-    bot.answer_callback_query(call.id, "⚔️ Дуэль началась!")
-    return
     elif call.data == "cancel_duel":
         if chat_id not in pending_duels:
             bot.answer_callback_query(call.id, "❌ Нет вызова на дуэль")
