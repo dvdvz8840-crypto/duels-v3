@@ -7,14 +7,17 @@ TOKEN = "8533497017:AAEr8AsVdxxR0hf6tYftdB2fzvDtgfoLY0U"
 ADMIN_ID = 6151671553
 bot = telebot.TeleBot(TOKEN)
 
-# --- Фото для команды /dbal ---
-IMG_BALANCE = "https://i.ibb.co/b5ndP1nq"
+# --- Фото ---
+IMG_BALANCE = "https://ibb.co/b5ndP1nq"        # Для /dbal
+IMG_WAIT_DUEL = "https://ibb.co/rRcZfj8g"      # Для ожидания соперника
+IMG_LEADERBOARD = "https://ibb.co/QhXYJsg"     # Для списка лидеров
+IMG_BONUS = "https://ibb.co/wxsrLM1"           # Для /dbonus
 
 # ---------------- Игроки и дуэли ----------------
-players = {}  # {user_id: {"username": str, "balance": int, "rating": int, "rank": str}}
-active_duels = {}  # {chat_id: {"player1": id, "player2": id, "bet": int, "turn": id, "shield": {id: bool}, "msg_id": id}}
-bonus_cooldown = {}  # {user_id: timestamp}
-pending_duels = {}  # {chat_id: {"initiator": id, "bet": int, "msg_id": int}}
+players = {}
+active_duels = {}
+bonus_cooldown = {}
+pending_duels = {}
 
 # Ранги с порогами рейтинга
 RANKS = [
@@ -24,11 +27,16 @@ RANKS = [
     ("🏹 Ас", 400),
     ("💀 Легенда", 600),
     ("🔥 Легендарный", 800),
-    ("👑 Мастер", 1000)
+    ("👑 Мастер", 1000),
+    ("🌟 Легендарный воин", 1200),
+    ("💎 Элитный боец", 1400),
+    ("⚡ Божественный", 1600),
+    ("🔥 Непобедимый", 1800),
+    ("👑 Владыка дуэлей", 2000)
 ]
 
 BONUS_AMOUNT = 500
-BONUS_COOLDOWN = 3600  # 1 час
+BONUS_COOLDOWN = 3600
 
 # ---------------- Функции ----------------
 def get_rank(rating):
@@ -80,10 +88,11 @@ def duel_request(message):
             InlineKeyboardButton("⚔️ Сразиться", callback_data="accept_duel"),
             InlineKeyboardButton("✖️ Отмена", callback_data="cancel_duel")
         )
-        msg = bot.send_message(
+        msg = bot.send_photo(
             message.chat.id,
-            f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n"
-            f"💬 Чтобы принять, нажмите кнопку снизу",
+            IMG_WAIT_DUEL,
+            caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> вызывает любого на дуэль!\n\n"
+                    f"💬 Чтобы принять, нажмите кнопку снизу",
             parse_mode="HTML",
             reply_markup=markup
         )
@@ -95,6 +104,7 @@ def duel_request(message):
 def duel_callbacks(call):
     chat_id = call.message.chat.id
     user_id = call.from_user.id
+
     # ---------------- Ожидающие дуэли ----------------
     if call.data == "accept_duel":
         if chat_id not in pending_duels:
@@ -106,7 +116,6 @@ def duel_callbacks(call):
             bot.answer_callback_query(call.id, "❌ Вы не можете принять свой вызов")
             return
         opponent = ensure_player(call.from_user)
-        # Убираем сообщение с кнопками
         bot.delete_message(chat_id, pending_duels[chat_id]["msg_id"])
         start_duel(chat_id, initiator_id, user_id, bet)
         del pending_duels[chat_id]
@@ -122,6 +131,7 @@ def duel_callbacks(call):
         del pending_duels[chat_id]
         bot.answer_callback_query(call.id, "✅ Вы отменили дуэль")
         return
+
     # ---------------- Активные дуэли ----------------
     if chat_id not in active_duels:
         bot.answer_callback_query(call.id, "❌ Нет активной дуэли")
@@ -145,8 +155,6 @@ def duel_callbacks(call):
             next_turn(chat_id)
     elif call.data == "cancel":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
-        # Отмена дуэли с штрафом
-        winner = players[opponent_id]
         loser = players[user_id]
         loser["rating"] -= 35
         loser["balance"] += int(duel["bet"]*0.85)
@@ -207,7 +215,7 @@ def end_duel(chat_id, winner_id, loser_id, bet):
     winner = players[winner_id]
     loser = players[loser_id]
     winner["balance"] += bet*2
-    winner["rating"] += 100
+    winner["rating"] += 30  # изменено с 100 на 30
     loser["rating"] -= 15
     update_rank(winner_id)
     update_rank(loser_id)
@@ -217,11 +225,11 @@ def end_duel(chat_id, winner_id, loser_id, bet):
                      f"<a href='https://t.me/{loser['username']}'>{loser['username']}</a>\n\n"
                      f"👑 Победитель: <a href='https://t.me/{winner['username']}'>{winner['username']}</a>\n"
                      f"💰 Выигрыш: {bet*2}\n"
-                     f"🎖️ Рейтинг: +100",
+                     f"🎖️ Рейтинг: +30",
                      parse_mode="HTML")
     del active_duels[chat_id]
 
-# ---------------- Остальные команды ----------------
+# ---------------- Баланс ----------------
 @bot.message_handler(commands=['dbal'])
 def check_balance(message):
     user_data = ensure_player(message.from_user)
@@ -239,6 +247,31 @@ def check_balance(message):
             f"🎖️ Ранг: {rank}\n"
             f"⚔️ Рейтинг: {rating}"
         ),
+        parse_mode="HTML"
+    )
+
+# ---------------- Бонус, Перевод, Админ, Лидерборд ----------------
+@bot.message_handler(commands=['dbonus'])
+def daily_bonus(message):
+    user = ensure_player(message.from_user)
+    user_id = message.from_user.id
+    now = time.time()
+    if user_id in bonus_cooldown and now - bonus_cooldown[user_id] < BONUS_COOLDOWN:
+        remaining = int(BONUS_COOLDOWN - (now - bonus_cooldown[user_id]))
+        mins, secs = divmod(remaining, 60)
+        bot.reply_to(message, f"🕒 Бонус снова будет доступен через {mins} минут и {secs} секунд")
+        return
+    rating_gain = random.randint(5,40)
+    user["balance"] += BONUS_AMOUNT
+    user["rating"] += rating_gain
+    update_rank(user_id)
+    bonus_cooldown[user_id] = now
+    bot.send_photo(
+        message.chat.id,
+        IMG_BONUS,
+        caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> Вы получили бонус!\n\n"
+                f"💰 +{BONUS_AMOUNT}\n"
+                f"🎖️ +{rating_gain}",
         parse_mode="HTML"
     )
 
@@ -297,36 +330,13 @@ def admin_give(message):
     except:
         bot.reply_to(message, "Использование: /двыдать @username сумма")
 
-@bot.message_handler(commands=['дбонус'])
-def daily_bonus(message):
-    user = ensure_player(message.from_user)
-    user_id = message.from_user.id
-    now = time.time()
-    if user_id in bonus_cooldown and now - bonus_cooldown[user_id] < BONUS_COOLDOWN:
-        remaining = int(BONUS_COOLDOWN - (now - bonus_cooldown[user_id]))
-        mins, secs = divmod(remaining, 60)
-        bot.reply_to(message, f"🕒 Бонус снова будет доступен через {mins} минут и {secs} секунд")
-        return
-    rating_gain = random.randint(5,40)
-    user["balance"] += BONUS_AMOUNT
-    user["rating"] += rating_gain
-    update_rank(user_id)
-    bonus_cooldown[user_id] = now
-    bot.send_message(
-        message.chat.id,
-        f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> Вы получили бонус!\n\n"
-        f"💰 +{BONUS_AMOUNT}\n"
-        f"🎖️ +{rating_gain}",
-        parse_mode="HTML"
-    )
-
 @bot.message_handler(commands=['drang'])
 def leaderboard(message):
     top = sorted(players.values(), key=lambda x:x["rating"], reverse=True)[:10]
     text = "⚔️ Список лидеров:\n\n"
     for i,p in enumerate(top,start=1):
         text += f"🔹 {i}. <a href='https://t.me/{p['username']}'>{p['username']}</a> - {p['rank']} | {p['rating']}\n"
-    bot.send_message(message.chat.id,text,parse_mode="HTML")
+    bot.send_photo(message.chat.id, IMG_LEADERBOARD, caption=text, parse_mode="HTML")
 
 # ---------------- Запуск ----------------
 bot.infinity_polling()
