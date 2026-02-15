@@ -15,8 +15,8 @@ IMG_DUEL_START = "https://i.ibb.co/PvXNfTTm"
 IMG_DUEL_END = "https://i.ibb.co/QvYxJmQs"
 IMG_RANK_UP = "https://i.ibb.co/Kz0g8vdv"
 IMG_RANK_DOWN = "https://i.ibb.co/KjWkJbqR"
-IMG_DUEL_CANCEL = "https://i.ibb.co/YBphVqG/duel-cancel.jpg"
-
+IMG_DUEL_CANCEL = "https://i.ibb.co/YBphVqG"
+IMG_LEADERBOARD = "https://ibb.co/QhXYJsg"
 # ---------------- Игроки ----------------
 players = {}  # {user_id: {"username": str, "balance": int, "rating": int, "rank": str}}
 active_duels = {}  # {chat_id: {"player1": id, "player2": id, "bet": int, "turn": id, "shield": {id: bool}, "msg_id": id}}
