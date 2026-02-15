@@ -261,7 +261,7 @@ def admin_give(message):
          bot.send_photo(
             message.chat.id,
             IMG_USPEX,
-            caption=f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
+            f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
             parse_mode="HTML"
         )
     except:
