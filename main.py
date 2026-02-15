@@ -160,7 +160,7 @@ def duel_callbacks(call):
         next_turn(chat_id)
     elif call.data == "shoot":
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
-        chance = 20 if duel["shield"].get(opponent_id, False) else 35
+        chance = 10 if duel["shield"].get(opponent_id, False) else 25
         hit = random.randint(1,100) <= chance
         if hit:
             end_duel(chat_id, user_id, opponent_id, duel["bet"])
@@ -310,8 +310,8 @@ def daily_bonus(message):
         message.chat.id,
         IMG_BONUS,
         caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> Вы получили бонус!\n\n"
-                f"💰 +{BONUS_AMOUNT}\n"
-                f"🎖️ +{rating_gain}",
+                f"💰 +{BONUS_AMOUNT} монет\n"
+                f"🎖️ +{rating_gain} рейтинга",
         parse_mode="HTML"
     )
 
