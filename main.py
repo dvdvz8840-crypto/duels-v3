@@ -193,6 +193,7 @@ def callback_duel(call):
             bot.send_message(chat_id, f"💥 <a href='https://t.me/{players[opponent_id]['username']}'>{players[opponent_id]['username']}</a> увернулся!", parse_mode="HTML")
             next_turn(chat_id)
     elif call.data == "cancel":
+        # Отмена во время дуэли
         opponent_id = duel["player2"] if user_id == duel["player1"] else duel["player1"]
         canceling_player = players[user_id]
         opponent_player = players[opponent_id]
@@ -224,7 +225,7 @@ def check_balance(message):
                             f"⚔️ Рейтинг: {user['rating']}"),
                    parse_mode="HTML")
 
-@bot.message_handler(commands=['дперевод'])
+@bot.message_handler(commands=['dg'])
 def transfer_coins(message):
     user = ensure_player(message.from_user)
     try:
@@ -250,7 +251,7 @@ def transfer_coins(message):
                          f"💰 Баланс {target['username']}: {target['balance']}",
                          parse_mode="HTML")
     except:
-        bot.reply_to(message,"Использование: /дперевод @username сумма")
+        bot.reply_to(message,"Использование: /dg @username сумма")
 
 @bot.message_handler(commands=['двыдать'])
 def admin_give(message):
@@ -273,7 +274,7 @@ def admin_give(message):
                          f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
                          parse_mode="HTML")
     except:
-        bot.reply_to(message,"Использование: двыдать @username сумма")
+        bot.reply_to(message,"Использование: /двыдать @username сумма")
 
 @bot.message_handler(commands=['dbonus'])
 def daily_bonus(message):
@@ -297,12 +298,17 @@ def daily_bonus(message):
                    parse_mode="HTML")
 
 @bot.message_handler(commands=['drang'])
-def leaderboard(message):
+def cmd_drang(message):
     top = sorted(players.values(), key=lambda x: x["rating"], reverse=True)[:10]
-    text = "⚔️ Список лидеров:\n\n"
-    for i,p in enumerate(top,start=1):
+    text = ""
+    for i, p in enumerate(top, start=1):
         text += f"🔹 {i}. <a href='https://t.me/{p['username']}'>{p['username']}</a> - {p['rank']} | {p['rating']}\n"
-    bot.send_message(message.chat.id,text,parse_mode="HTML")
+    bot.send_photo(
+        message.chat.id,
+        photo=IMG_LEADERBOARD,
+        caption="⚔️ Список лидеров:\n\n" + text,
+        parse_mode="HTML"
+     )
 
 # ---------------- Запуск бота ----------------
 bot.infinity_polling()
