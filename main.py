@@ -17,12 +17,13 @@ IMG_RANK_UP = "https://ibb.co/Kz0g8vdv"
 IMG_RANK_DOWN = "https://ibb.co/KjWkJbqR"
 IMG_DUEL_START = "https://ibb.co/PvXNfTTm"
 IMG_DUEL_END = "https://ibb.co/QvYxJmQs"
+IMG_TRANSACTION = "https://ibb.co/cSbBpXJL"  # Новое фото для выдачи и перевода монет
 
 # ---------------- Игроки и дуэли ----------------
-players = {}           # {user_id: {username, balance, rating, rank}}
-active_duels = {}      # {chat_id: {player1, player2, bet, turn, shield, msg_id}}
-pending_duels = {}     # {chat_id: {initiator, bet, msg_id}}
-bonus_cooldown = {}    # {user_id: timestamp}
+players = {}
+active_duels = {}
+pending_duels = {}
+bonus_cooldown = {}
 
 # Ранги с порогами рейтинга
 RANKS = [
@@ -109,7 +110,6 @@ def duel_request(message):
     except:
         bot.reply_to(message, "💬 Чтобы кинуть вызов в чат, введите /dd (сумма)")
 
-# ---------------- Callbacks ----------------
 @bot.callback_query_handler(func=lambda call: call.data in ["accept_duel","cancel_duel","shoot","shield","cancel"])
 def duel_callbacks(call):
     chat_id = call.message.chat.id
@@ -252,18 +252,19 @@ def admin_give(message):
                 target_id = uid
                 break
         if not target:
-            # создаём нового игрока с уникальным user_id на основе hash
             target_id = hash(target_username)
             players[target_id] = {"username": target_username, "balance": 0, "rating":0, "rank": get_rank(0)}
             target = players[target_id]
         target["balance"] += amount
-        bot.send_message(
+        bot.send_photo(
             message.chat.id,
-            f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
+            IMG_TRANSACTION,
+            caption=f"💰 К балансу <a href='https://t.me/{target['username']}'>{target['username']}</a> добавлено {amount} монет.",
             parse_mode="HTML"
         )
     except:
         bot.reply_to(message, "💎 Чтобы выдать монеты: /двыдать @username сумма")
+
 
 @bot.message_handler(commands=['дперевод'])
 def transfer_coins(message):
@@ -285,11 +286,12 @@ def transfer_coins(message):
             return
         user["balance"] -= amount
         target["balance"] += amount
-        bot.send_message(
+        bot.send_photo(
             message.chat.id,
-            f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> перевел "
-            f"<a href='https://t.me/{target['username']}'>{target['username']}</a> {amount} монет.\n"
-            f"💰 Баланс <a href='https://t.me/{user['username']}'>{user['username']}</a>: {target['balance']}",
+            IMG_TRANSACTION,
+            caption=f"⚔️ <a href='https://t.me/{user['username']}'>{user['username']}</a> перевел "
+                    f"<a href='https://t.me/{target['username']}'>{target['username']}</a> {amount} монет.\n"
+                    f"💰 Баланс <a href='https://t.me/{user['username']}'>{user['username']}</a>: {target['balance']}",
             parse_mode="HTML"
         )
     except:
