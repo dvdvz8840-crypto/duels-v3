@@ -108,7 +108,7 @@ def duel_request(message):
         )
         pending_duels[message.chat.id] = {"initiator": message.from_user.id, "bet": bet, "msg_id": msg.message_id}
     except:
-        bot.reply_to(message, "Использование: /dd <сумма>")
+        bot.reply_to(message, "💬 Чтобы кинуть вызов, введите /dd (сумма)")
 
 @bot.callback_query_handler(func=lambda call: call.data in ["accept_duel","cancel_duel","shoot","shield","cancel"])
 def duel_callbacks(call):
